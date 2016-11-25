@@ -1,0 +1,599 @@
+<link rel="import" href="../polymer/polymer.html">
+
+<link rel="import" href="../iron-ajax/iron-ajax.html">
+<link rel="import" href="../iron-flex-layout/iron-flex-layout.html">
+<link rel="import" href="../iron-flex-layout/iron-flex-layout-classes.html">
+<link rel="import" href="../iron-icons/iron-icons.html">
+<link rel="import" href="../paper-dialog/paper-dialog.html">
+<link rel="import" href="../paper-toolbar/paper-toolbar.html">
+<link rel="import" href="../paper-icon-button/paper-icon-button.html">
+<link rel="import" href="../paper-scroll-header-panel/paper-scroll-header-panel.html">
+<link rel="import" href="../paper-item/paper-item.html">
+<link rel="import" href="../paper-card/paper-card.html">
+<link rel="import" href="../iron-form/iron-form.html">
+<link rel="import" href="../paper-input/paper-input.html">
+<link rel="import" href="../paper-input/paper-input-char-counter.html">
+<link rel="import" href="../paper-button/paper-button.html">
+<link rel="import" href="../paper-spinner/paper-spinner.html">
+
+
+<!--
+Shows the comments contained in the thread and allows interaction if permission is set.
+
+Example:
+
+    <las2peer-shortmessage-service-widget thread='...'></las2peer-shortmessage-service-widget>
+
+@demo demo/index.html
+-->
+
+<dom-module id="las2peer-shortmessage-service-widget">
+
+  <template>
+
+    <iron-ajax id="ajaxSubmitMessage"
+                method = 'POST'
+                url = '[[_baseUrl]]/messages/[[recipientId]]'
+                handle-as = "text"
+                on-response = "_receiveSendMessage"
+                on-error = "_handleError"
+                headers = '[[_requestHeaders]]',
+                loading = "{{_submittingMessage}}"
+                content-type = 'text/plain'
+              >
+    </iron-ajax>
+
+    <style include="iron-flex iron-positioning iron-flex-alignment">
+      :host {
+        display: block;
+        box-sizing: border-box;
+        min-width: 400px;
+        min-height: 300px;
+        @apply(--layout-flex);
+        @apply(--layout-vertical);
+      }
+      #sms-widget-toolbar {
+//        background-color: #B0B;
+      }
+      #msginputform {
+        @apply(--layout-horizontal);
+        background-color: #FFF;
+      }
+      #messageinputcontainer {
+        @apply(--layout-flex);
+      }
+    </style>
+
+    <paper-dialog id="error-dialog" modal="true">
+      <h2>[[_errorDialogTitle]]</h2>
+      <div>[[_errorDialogMessage]]</div>
+      <div class="buttons">
+        <paper-button dialog-dismiss>OK</paper-button>
+      </div>
+    </paper-dialog>
+
+    <template is="dom-if" if="[[_isEmpty(recipientId)]]">
+      <paper-card heading="No recipient selected">
+        <div class="card-content">
+          Please select a recipient to chat with.
+        </div>
+      </paper-card>
+    </template>
+
+    <template is="dom-if" if="[[!_isEmpty(recipientId)]]">
+
+      <paper-toolbar id="sms-widget-toolbar">
+        <paper-icon-button icon="account-circle"></paper-icon-button>
+        <div class="title">[[recipientId]]</div>
+        <paper-icon-button id="button-icon-error" on-click="showErrorDialog" icon="error" hidden></paper-icon-button>
+<!--      <paper-icon-button icon="more-vert"></paper-icon-button>-->
+      </paper-toolbar>
+
+      <message-list base-url="[[_baseUrl]]" recipient-id="[[recipientId]]" initial-limit="[[initialMessageCount]]" history-limit="[[historyMessageCount]]" message-polling-interval="[[messagePollingInterval]]" request-headers="[[_requestHeaders]]"></message-list>
+
+      <form is="iron-form" id="msginputform" on-iron-form-presubmit="_submitMessage">
+        <paper-input-container id="messageinputcontainer">
+          <label>Enter your message</label>
+          <input is="iron-input" name="messageInput" maxlength="140" autocomplete="off">
+          <paper-input-char-counter id="sms-widget-message-input-char-counter"></paper-input-char-counter>
+          <paper-spinner suffix active="[[_submittingMessage]]"></paper-spinner>
+          <paper-icon-button suffix icon="send" on-click="_submitButton" disabled="[[_submittingMessage]]"></paper-icon-button>
+        </paper-input-container>
+      </form>
+
+    </template>
+
+  </template>
+
+  <script>
+    Polymer({
+      is: 'las2peer-shortmessage-service-widget',
+
+      properties: {
+        baseUrl: {
+          type: String,
+          value: 'http://localhost:14580/'
+        },
+        _baseUrl:  {
+          type: String,
+          computed: '_computeBaseURL(baseUrl)'
+        },
+        loginName: {
+          type: String,
+          value: null
+        },
+        loginPassword: {
+          type: String,
+          value: null
+        },
+        loginOidcToken: {
+          type: String,
+          value: null
+        },
+        loginOidcProvider: {
+          type: String,
+          value: null
+        },
+        _requestHeaders: {
+          type: Object,
+          computed: '_computeHeaders(loginName,loginPassword,loginOidcToken,loginOidcProvider)'
+        },
+        recipientId: {
+          type: String,
+          value: null
+        },
+        initialMessageCount: {
+          type: Number,
+          value: -20
+        },
+        historyMessageCount: {
+          type: Number,
+          value: 10
+        },
+        messagePollingInterval: {
+          type: Number,
+          value: 2000
+        },
+        _submittingMessage: {
+          type: Boolean,
+          value: false
+        },
+        _errorDialogTitle: {
+          type: String,
+          value: null
+        },
+        _errorDialogMessage: {
+          type: String,
+          value: null
+        },
+      },
+
+      showErrorDialog: function() {
+        this.querySelector('#error-dialog').open();
+        this.querySelector('#button-icon-error').setAttribute('hidden', '');
+        this.querySelector('#sms-widget-toolbar').style.background = '';
+      },
+
+      clearMessages: function() {
+        var messageList = this.querySelector('message-list');
+        if (messageList) {
+          messageList.clear();
+        }
+      },
+
+      _computeBaseURL: function(base) {
+        if (!base.endsWith('/')) {
+          base = base + '/';
+        }
+        return base + "sms-service";
+      },
+
+      _computeHeaders: function(loginName,loginPassword,loginOidcToken,loginOidcProvider) {
+        var headers = {};
+
+        if (loginName != null && loginPassword != null) {
+          headers["Authorization"] = "Basic " + btoa(loginName + ":" + loginPassword);
+        }
+        else if(loginOidcToken != null) {
+          headers["access_token"] = loginOidcToken;
+
+          if (loginOidcProvider != null) {
+            headers["oidc_provider"] = loginOidcProvider;
+          }
+        }
+
+        return headers;
+      },
+
+      _isEmpty(val) {
+        return val ? false : true;
+      },
+
+      _submitButton(event) {
+        this.querySelector('#msginputform').submit();
+      },
+
+      _submitMessage(event) {
+        event.preventDefault()
+
+        var form = Polymer.dom(event).localTarget;
+        var ajax = this.$.ajaxSubmitMessage;
+
+        ajax.body = form.elements.messageInput.value;
+
+        form.elements.messageInput.value = "";
+        this.querySelector('#messageinputcontainer').updateAddons({'inputElement': form.elements.messageInput, 'value': '', 'invalid': false});
+
+        ajax.generateRequest();
+      },
+
+      _receiveSendMessage(event) {
+//        console.log(event.target.lastResponse); // log success message
+        this.querySelector('message-list').triggerPolling();
+      },
+
+      _handleError(event) {
+        if (event.detail.request.xhr.readyState == 4 && event.detail.request.xhr.status == 0) { // network issues
+          this._errorDialogTitle = 'Network Connection Error';
+          this._errorDialogMessage = 'Could not connect to:<br />' + event.detail.request.url;
+        }
+        else {
+          console.log(event);
+          this._errorDialogTitle = event.detail.error;
+          var response = event.detail.request.xhr.responseText;
+          if (response) {
+            this._errorDialogMessage = response;
+          }
+          else { // no error message returned, show generic message
+            this._errorDialogMessage = 'An error occurred. Please try again.';
+          }
+        }
+        var toolbar = this.querySelector('#sms-widget-toolbar');
+        toolbar.style.background = '#F00';
+        toolbar.querySelector('#button-icon-error').removeAttribute('hidden');
+      },
+
+    });
+  </script>
+</dom-module>
+
+
+<dom-module id="message-list">
+
+  <template>
+
+    <iron-ajax id="ajaxMessages"
+                method = 'GET'
+                url = '[[baseUrl]]/messages/[[recipientId]]'
+                handle-as = "json"
+                on-response = "_receiveMessages"
+                on-error = "_handleError"
+                headers = '[[requestHeaders]]'
+                loading = '{{_fetchingMessages}}'
+              >
+    </iron-ajax>
+
+    <iron-ajax id="ajaxHistory"
+                method = 'GET'
+                url = '[[baseUrl]]/messages/[[recipientId]]'
+                handle-as = "json"
+                on-response = "_receiveHistory"
+                on-error = "_handleError"
+                headers = '[[requestHeaders]]'
+                loading = '{{_fetchingHistory}}'
+              >
+    </iron-ajax>
+
+    <style>
+      :host {
+        display: block;
+        box-sizing: border-box;
+        background-color: #CCC;
+        @apply(--layout-flex);
+        @apply(--layout-vertical);
+        position: relative;
+      }
+      .messageloadingtoast {
+        position: absolute;
+        z-index: 5;
+        left: 0;
+        right: 0;
+        background-color: rgba(128,128,128,0.3);
+        text-align: center;
+      }
+      .messagelisterror {
+        position: absolute;
+        z-index: 5;
+        left: 0;
+        right: 0;
+        bottom: 0;
+        background-color: rgba(255,0,0,0.7);
+        padding: 0.5em;
+        font-weight: bold;
+        color: #FFF;
+      }
+      #messagescroll {
+        @apply(--layout-flex);
+        @apply(--layout-vertical);
+      }
+    </style>
+
+    <div class="messageloadingtoast" hidden="[[!isLoading]]"><paper-spinner active></paper-spinner></div>
+
+    <paper-scroll-header-panel id="messagescroll">
+      <template is="dom-repeat" id="messagerepeat" items="[[_data]]">
+        <single-message data="{{item}}"></single-message>
+      </template>
+    </paper-scroll-header-panel>
+
+    <div class="messagelisterror" hidden="[[!_errorMsg]]"></div>
+
+  </template>
+
+  <script>
+    Polymer({
+      is: 'message-list',
+
+      properties: {
+        baseUrl: String,
+        recipientId: String,
+        initialLimit: Number,
+        historyLimit: Number,
+        messagePollingInterval: Number,
+        isLoading: {
+          type: Boolean,
+          computed: '_isLoading(_firstReceiveMessages, _fetchingHistory)'
+        },
+        requestHeaders: {
+          type: Object,
+          value: {}
+        },
+        _data: {
+          type: Array,
+          value: []
+        },
+        _fetchingMessages: {
+          type: Boolean,
+          value: false
+        },
+        _fetchingHistory: {
+          type: Boolean,
+          value: false
+        },
+        _lastKnownIndex: {
+          type: Number,
+          value: -1
+        },
+        _firstReceiveMessages: {
+          type: Boolean,
+          value: true
+        },
+        _errorMsg: {
+          type: String,
+          value: null,
+          observer: '_setErrorMsgHtml'
+        },
+        upperThreshold: {
+          type: Number,
+          value: 200
+        },
+        _upperTriggered: {
+          type: Boolean,
+          value: true,
+        },
+      },
+
+      _isLoading: function(firstReceiveMessages, fetchingHistory) {
+        return firstReceiveMessages || fetchingHistory;
+      },
+
+      _setErrorMsgHtml: function(msg) {
+        this.querySelector('.messagelisterror').innerHTML = msg;
+      },
+
+      // Element lifecycle
+
+      ready: function() {
+        // start polling
+        this._pollMessages(true);
+        // activate upper threshold listener
+        this.querySelector('#messagescroll').scroller.addEventListener('scroll', function (event) {
+          var scroller = event.target;
+          var messageList = scroller.parentElement.parentElement;
+          if (scroller.scrollTop < messageList.upperThreshold) {
+            if (messageList._upperTriggered === false) {
+              messageList._upperTriggered = true;
+              messageList.triggerPolling();
+            }
+          }
+          else {
+            if (messageList._upperTriggered === true) {
+              messageList._upperTriggered = false;
+            }
+          }
+        });
+      },
+
+      // Element behavior
+
+      clear() {
+        this._data = [];
+        this._firstReceiveMessages = true;
+      },
+
+      // Send requests
+
+      triggerPolling() {
+        this._pollMessages(false);
+      },
+
+      _pollMessages(repeat) {
+        var ajaxMessages = this.$.ajaxMessages;
+        var ajaxHistory = this.$.ajaxHistory;
+        if (this._firstReceiveMessages) { // inital loading with initial message limit
+          ajaxMessages.headers['startIndex'] = 0;
+          ajaxMessages.headers['limit'] = this.initialLimit;
+//          console.log("polling messages with startIndex (" + ajaxMessages.headers['startIndex'] + ") and limit (" + ajaxMessages.headers['limit'] + ")");
+          ajaxMessages.generateRequest();
+        }
+        else {
+          var scroller = this.querySelector('#messagescroll').scroller;
+          if (scroller.scrollTop < this.upperThreshold && scroller.scrollHeight > scroller.offsetHeight) { // fetch history
+            var firstIndex = 0;
+            if (this._data) {
+              firstIndex = this._data[0].index;
+            }
+            var startIndex = Math.max(firstIndex - Math.abs(this.historyLimit), 0);
+            var limit = Math.min(Math.abs(this.historyLimit), firstIndex);
+            if (limit > 0) {
+              ajaxHistory.headers['startIndex'] = startIndex;
+              ajaxHistory.headers['limit'] = limit;
+//              console.log("fetching history with startIndex (" + ajaxHistory.headers['startIndex'] + ") and limit (" + ajaxHistory.headers['limit'] + ")");
+              ajaxHistory.generateRequest();
+            }
+          }
+          else { // fetch new messages
+            ajaxMessages.headers['startIndex'] = this._lastKnownIndex + 1;
+            ajaxMessages.headers['limit'] = 0;
+//            console.log("polling messages with startIndex (" + ajaxMessages.headers['startIndex'] + ") and limit (" + ajaxMessages.headers['limit'] + ")");
+            ajaxMessages.generateRequest();
+          }
+        }
+        if (repeat) {
+          setTimeout(this._pollMessages.bind(this, true), this.messagePollingInterval);
+        }
+      },
+
+      // Data processing
+
+      _receiveMessages(event) {
+        this._errorMsg = null;
+        // update data set
+        var messagesToAdd = event.target.lastResponse;
+        if (messagesToAdd && messagesToAdd.length) {
+          this._data = this._data.concat(messagesToAdd);
+          // force synchronous update
+          this.querySelector('#messagerepeat').render();
+          // scrolling
+          var messagescroll = this.querySelector('#messagescroll');
+          var scroller = messagescroll.scroller;
+          if (this._firstReceiveMessages || scroller.scrollHeight - scroller.scrollTop - scroller.offsetHeight < 100) { // scroll bar is near the end
+            this._firstReceiveMessages = false;
+            messagescroll.scroll(scroller.scrollHeight, true); // // true, works better with chromium
+          }
+          // update index
+          this._lastKnownIndex = messagesToAdd[messagesToAdd.length - 1].index;
+        }
+      },
+
+      _receiveHistory(event) {
+        this._errorMsg = null;
+        // update data set
+        var messagesToAdd = event.target.lastResponse;
+        if (messagesToAdd && messagesToAdd.length) {
+          var messagescroll = this.querySelector('#messagescroll');
+          var scroller = messagescroll.scroller;
+          var oldHeight = scroller.scrollHeight;
+          this._data = messagesToAdd.concat(this._data);
+          // force synchronous update
+          this.querySelector('#messagerepeat').render();
+          // scroll back to old position after update
+          messagescroll.scroll(scroller.scrollTop + scroller.scrollHeight - oldHeight, false);
+        }
+      },
+
+      // Error handling
+
+      _handleError(event) {
+        if (event.detail.request.xhr.readyState == 4 && event.detail.request.xhr.status == 0) { // network issues
+          this._errorMsg = 'Network Connection Error - Could not connect to: ' + event.detail.request.url;
+        }
+        else {
+//          console.log(event);
+          this._errorMsg = event.detail.error;
+          // read error messages array, if exists
+          var response = event.detail.request.xhr.response
+          if (response) {
+            this._errorMsg = this._errorMsg + " - " + response.join('<br />');
+          }
+        }
+      },
+
+    });
+  </script>
+
+</dom-module>
+
+
+<dom-module id="single-message">
+
+  <template>
+
+    <style>
+      :host {
+        @apply(--layout-horizontal);
+        margin: 0.5em;
+      }
+      .card-content {
+        @apply(--layout-vertical);
+      }
+      .details {
+        color: #555;
+        font-style: italic;
+      }
+      .msgline {
+        @apply(--layout-horizontal);
+      }
+      .message {
+        @apply(--layout-flex);
+      }
+      .timestamp {
+        margin-left: 1em;
+      }
+    </style>
+
+    <paper-card style="[[_styleMessage(data.isAuthor)]]">
+      <div class="card-content">
+        <template is="dom-if" if="{{!data.isAuthor}}">
+          <div class="details">[[data.senderId]]</div>
+        </template>
+        <div class="msgline"><div class="message">[[data.message]]</div><div class="details timestamp">[[_dateToStr(data.timeSend)]]</div></div>
+      </div>
+    </paper-card>
+
+  </template>
+
+  <script>
+    Polymer({
+      is: 'single-message',
+
+      properties: {
+        data: Object
+      },
+
+      // Element behavior
+
+      _styleMessage(isAuthor) {
+        if (isAuthor) {
+          return 'background-color: #CCDDFF';
+        }
+        return '';
+      },
+
+      _dateToStr(utcMilliSeconds) {
+        if (utcMilliSeconds!=undefined) {
+          var d = new Date(utcMilliSeconds);
+          var strHours = d.getHours();
+          var strMinutes = d.getMinutes().toString();
+          strMinutes = strMinutes.length > 1 ? strMinutes : '0' + strMinutes;
+          return strHours + ':' + strMinutes;
+        }
+        else {
+          return "";
+        }
+      },
+
+    });
+  </script>
+
+</dom-module>

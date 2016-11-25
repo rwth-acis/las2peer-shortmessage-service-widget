@@ -1,0 +1,87 @@
+<!doctype html>
+<!--
+@license
+Copyright (c) 2015 The Polymer Project Authors. All rights reserved.
+This code may only be used under the BSD style license found at http://polymer.github.io/LICENSE.txt
+The complete set of authors may be found at http://polymer.github.io/AUTHORS.txt
+The complete set of contributors may be found at http://polymer.github.io/CONTRIBUTORS.txt
+Code distributed by Google as part of the polymer project is also
+subject to an additional IP rights grant found at http://polymer.github.io/PATENTS.txt
+-->
+<html>
+<head>
+
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, minimum-scale=1.0, user-scalable=yes">
+  <title>las2peer-shortmessage-service-widget Demo</title>
+  <script src="../../webcomponentsjs/webcomponents-lite.min.js"></script>
+  <link rel="import" href="../../iron-flex-layout/iron-flex-layout-classes.html">
+  <link rel="import" href="../las2peer-shortmessage-service-widget.html">
+  <style is="custom-style" include="iron-flex iron-positioning iron-flex-alignment"></style>
+
+</head>
+<body class="fullbleed vertical layout" unresolved>
+  <h1><code>&lt;las2peer-shortmessage-service-widget&gt;</code> Demo</h1>
+
+<!--  <p>This example generates a new thread and sets up example permissions as shown in the dropdown. <button onclick="createThread()">Generate new Thread</button></p>-->
+
+  <p>Authentication
+    <select onchange="setUser()" id="userSelector">
+      <option value="User A">User A</option>
+      <option value="User B">User B</option>
+      <option value="User C">User C</option>
+      <option value="User D">User D</option>
+    </select>
+    Recipient
+    <select onchange="setRecipient()" id="recipientSelector">
+      <option value="none">none</option>
+      <option value="User A">User A</option>
+      <option value="User B" selected>User B</option>
+      <option value="User C">User C</option>
+      <option value="User D">User D</option>
+    </select>
+  </p>
+
+  <div class="flex layout vertical" style="padding: 0.5em">
+    <las2peer-shortmessage-service-widget id="smsWidget"></las2peer-shortmessage-service-widget>
+  </div>
+
+  <script>
+    var smsWidget = document.getElementById("smsWidget");
+    var userSelector = document.getElementById("userSelector");
+    var recipientSelector = document.getElementById("recipientSelector");
+    var userPass = {
+      "User A": "userAPass",
+      "User B": "userBPass",
+      "User C": "userCPass",
+      "User D": "userDPass"
+    };
+    var userId = {
+      "none": "",
+      "User A": "-6882384308892167869",
+      "User B": "-3961711602044829614",
+      "User C": "",
+      "User D": ""
+    };
+
+    function setUser() {
+      var currentUser = userSelector.options[userSelector.selectedIndex].value;
+      smsWidget.setAttribute("login-name", currentUser);
+      smsWidget.setAttribute("login-password", userPass[currentUser]);
+      smsWidget.clearMessages();
+    }
+
+    function setRecipient() {
+      var currentRecipient = recipientSelector.options[recipientSelector.selectedIndex].value;
+      smsWidget.setAttribute("recipient-id", userId[currentRecipient]);
+      smsWidget.clearMessages();
+    }
+
+    window.addEventListener("WebComponentsReady", function() {
+      setUser();
+      setRecipient();
+    });
+  </script>
+
+</body>
+</html>
