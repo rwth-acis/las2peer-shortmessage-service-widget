@@ -205,15 +205,15 @@ Example:
         return headers;
       },
 
-      _isEmpty(val) {
+      _isEmpty: function(val) {
         return val ? false : true;
       },
 
-      _submitButton(event) {
+      _submitButton: function(event) {
         this.querySelector('#msginputform').submit();
       },
 
-      _submitMessage(event) {
+      _submitMessage: function(event) {
         event.preventDefault()
 
         var form = Polymer.dom(event).localTarget;
@@ -227,12 +227,12 @@ Example:
         ajax.generateRequest();
       },
 
-      _receiveSendMessage(event) {
+      _receiveSendMessage: function(event) {
 //        console.log(event.target.lastResponse); // log success message
         this.querySelector('message-list').triggerPolling();
       },
 
-      _handleError(event) {
+      _handleError: function(event) {
         if (event.detail.request.xhr.readyState == 4 && event.detail.request.xhr.status == 0) { // network issues
           this._errorDialogTitle = 'Network Connection Error';
           this._errorDialogMessage = 'Could not connect to:<br />' + event.detail.request.url;
@@ -416,18 +416,18 @@ Example:
 
       // Element behavior
 
-      clear() {
+      clear: function() {
         this._data = [];
         this._firstReceiveMessages = true;
       },
 
       // Send requests
 
-      triggerPolling() {
+      triggerPolling: function() {
         this._pollMessages(false);
       },
 
-      _pollMessages(repeat) {
+      _pollMessages: function(repeat) {
         var ajaxMessages = this.$.ajaxMessages;
         var ajaxHistory = this.$.ajaxHistory;
         if (this._firstReceiveMessages) { // inital loading with initial message limit
@@ -466,7 +466,7 @@ Example:
 
       // Data processing
 
-      _receiveMessages(event) {
+      _receiveMessages: function(event) {
         this._errorMsg = null;
         // update data set
         var messagesToAdd = event.target.lastResponse;
@@ -486,7 +486,7 @@ Example:
         }
       },
 
-      _receiveHistory(event) {
+      _receiveHistory: function(event) {
         this._errorMsg = null;
         // update data set
         var messagesToAdd = event.target.lastResponse;
@@ -504,7 +504,7 @@ Example:
 
       // Error handling
 
-      _handleError(event) {
+      _handleError: function(event) {
         if (event.detail.request.xhr.readyState == 4 && event.detail.request.xhr.status == 0) { // network issues
           this._errorMsg = 'Network Connection Error - Could not connect to: ' + event.detail.request.url;
         }
@@ -573,14 +573,14 @@ Example:
 
       // Element behavior
 
-      _styleMessage(isAuthor) {
+      _styleMessage: function(isAuthor) {
         if (isAuthor) {
           return 'background-color: #CCDDFF';
         }
         return '';
       },
 
-      _dateToStr(utcMilliSeconds) {
+      _dateToStr: function(utcMilliSeconds) {
         if (utcMilliSeconds!=undefined) {
           var d = new Date(utcMilliSeconds);
           var strHours = d.getHours();
