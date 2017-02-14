@@ -1,0 +1,73 @@
+
+<dom-module id="las2peer-shortmessage-service-messagelist-single-message">
+
+  <template>
+
+    <style>
+      :host {
+        @apply(--layout-horizontal);
+        margin: 0.5em;
+      }
+      .card-content {
+        @apply(--layout-vertical);
+      }
+      .details {
+        color: #555;
+        font-style: italic;
+      }
+      .msgline {
+        @apply(--layout-horizontal);
+      }
+      .message {
+        @apply(--layout-flex);
+      }
+      .timestamp {
+        margin-left: 1em;
+      }
+    </style>
+
+    <paper-card style="[[_styleMessage(data.isAuthor)]]">
+      <div class="card-content">
+        <template is="dom-if" if="{{!data.isAuthor}}">
+          <div class="details">[[data.senderId]]</div>
+        </template>
+        <div class="msgline"><div class="message">[[data.message]]</div><div class="details timestamp">[[_dateToStr(data.timeSend)]]</div></div>
+      </div>
+    </paper-card>
+
+  </template>
+
+  <script>
+    Polymer({
+      is: 'las2peer-shortmessage-service-messagelist-single-message',
+
+      properties: {
+        data: Object
+      },
+
+      // Element behavior
+
+      _styleMessage: function(isAuthor) {
+        if (isAuthor) {
+          return 'background-color: #CCDDFF';
+        }
+        return '';
+      },
+
+      _dateToStr: function(utcMilliSeconds) {
+        if (utcMilliSeconds!=undefined) {
+          var d = new Date(utcMilliSeconds);
+          var strHours = d.getHours();
+          var strMinutes = d.getMinutes().toString();
+          strMinutes = strMinutes.length > 1 ? strMinutes : '0' + strMinutes;
+          return strHours + ':' + strMinutes;
+        }
+        else {
+          return "";
+        }
+      },
+
+    });
+  </script>
+
+</dom-module>

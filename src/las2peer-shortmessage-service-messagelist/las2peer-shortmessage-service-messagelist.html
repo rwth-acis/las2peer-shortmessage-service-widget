@@ -1,0 +1,279 @@
+
+<link rel="import" href="las2peer-shortmessage-service-messagelist-single-message.html">
+
+<dom-module id="las2peer-shortmessage-service-messagelist">
+
+  <template>
+
+    <iron-ajax id="ajaxMessages"
+                method = 'GET'
+                url = '[[realServiceEndpointUrl]]/messages/[[recipientId]]'
+                handle-as = "json"
+                on-response = "_receiveMessages"
+                on-error = "_handleError"
+                headers = '[[requestHeaders]]'
+                loading = '{{_fetchingMessages}}'
+              >
+    </iron-ajax>
+
+    <iron-ajax id="ajaxHistory"
+                method = 'GET'
+                url = '[[realServiceEndpointUrl]]/messages/[[recipientId]]'
+                handle-as = "json"
+                on-response = "_receiveHistory"
+                on-error = "_handleError"
+                headers = '[[requestHeaders]]'
+                loading = '{{_fetchingHistory}}'
+              >
+    </iron-ajax>
+
+    <style>
+      :host {
+        display: block;
+        box-sizing: border-box;
+        background-color: #CCC;
+        @apply(--layout-flex);
+        @apply(--layout-vertical);
+        position: relative;
+      }
+      .messageloadingtoast {
+        position: absolute;
+        z-index: 5;
+        left: 0;
+        right: 0;
+        background-color: rgba(128,128,128,0.3);
+        text-align: center;
+      }
+      .messagelisterror {
+        position: absolute;
+        z-index: 5;
+        left: 0;
+        right: 0;
+        bottom: 0;
+        background-color: rgba(255,0,0,0.7);
+        padding: 0.5em;
+        font-weight: bold;
+        color: #FFF;
+      }
+      #messagescroll {
+        @apply(--layout-flex);
+        @apply(--layout-vertical);
+      }
+    </style>
+
+    <div class="messageloadingtoast" hidden="[[!isLoading]]"><paper-spinner active></paper-spinner></div>
+
+    <paper-scroll-header-panel id="messagescroll">
+      <template is="dom-repeat" id="messagerepeat" items="[[_data]]">
+        <las2peer-shortmessage-service-messagelist-single-message data="{{item}}"></las2peer-shortmessage-service-messagelist-single-message>
+      </template>
+    </paper-scroll-header-panel>
+
+    <div class="messagelisterror" hidden="[[!_errorMsg]]"></div>
+
+  </template>
+
+  <script>
+    Polymer({
+      is: 'las2peer-shortmessage-service-messagelist',
+
+      properties: {
+        serviceEndpointUrl: String,
+        realServiceEndpointUrl:  {
+          type: String,
+          computed: '_computeServiceEndpointUrl(serviceEndpointUrl)'
+        },
+        recipientId: String,
+        initialLimit: Number,
+        historyLimit: Number,
+        messagePollingInterval: Number,
+        isLoading: {
+          type: Boolean,
+          computed: '_isLoading(_firstReceiveMessages, _fetchingHistory)'
+        },
+        requestHeaders: {
+          type: Object,
+          value: {}
+        },
+        _data: {
+          type: Array,
+          value: []
+        },
+        _fetchingMessages: {
+          type: Boolean,
+          value: false
+        },
+        _fetchingHistory: {
+          type: Boolean,
+          value: false
+        },
+        _lastKnownIndex: {
+          type: Number,
+          value: -1
+        },
+        _firstReceiveMessages: {
+          type: Boolean,
+          value: true
+        },
+        _errorMsg: {
+          type: String,
+          value: null,
+          observer: '_setErrorMsgHtml'
+        },
+        upperThreshold: {
+          type: Number,
+          value: 200
+        },
+        _upperTriggered: {
+          type: Boolean,
+          value: true,
+        },
+      },
+
+      _computeServiceEndpointUrl: function(url) {
+        if (url.endsWith('/')) {
+          url = url.slice(0, -1);
+        }
+        return url;
+      },
+
+      _isLoading: function(firstReceiveMessages, fetchingHistory) {
+        return firstReceiveMessages || fetchingHistory;
+      },
+
+      _setErrorMsgHtml: function(msg) {
+        this.querySelector('.messagelisterror').innerHTML = msg;
+      },
+
+      // Element lifecycle
+
+      ready: function() {
+        // start polling
+        this._pollMessages(true);
+        // activate upper threshold listener
+        this.querySelector('#messagescroll').scroller.addEventListener('scroll', function (event) {
+          var scroller = event.target;
+          var messageList = scroller.parentElement.parentElement;
+          if (scroller.scrollTop < messageList.upperThreshold) {
+            if (messageList._upperTriggered === false) {
+              messageList._upperTriggered = true;
+              messageList.triggerPolling();
+            }
+          }
+          else {
+            if (messageList._upperTriggered === true) {
+              messageList._upperTriggered = false;
+            }
+          }
+        });
+      },
+
+      // Element behavior
+
+      clear: function() {
+        this._data = [];
+        this._firstReceiveMessages = true;
+      },
+
+      // Send requests
+
+      triggerPolling: function() {
+        this._pollMessages(false);
+      },
+
+      _pollMessages: function(repeat) {
+        var ajaxMessages = this.$.ajaxMessages;
+        var ajaxHistory = this.$.ajaxHistory;
+        if (this._firstReceiveMessages) { // inital loading with initial message limit
+          ajaxMessages.headers['startIndex'] = 0;
+          ajaxMessages.headers['limit'] = this.initialLimit;
+//          console.log("polling messages with startIndex (" + ajaxMessages.headers['startIndex'] + ") and limit (" + ajaxMessages.headers['limit'] + ")");
+          ajaxMessages.generateRequest();
+        }
+        else {
+          var scroller = this.querySelector('#messagescroll').scroller;
+          if (scroller.scrollTop < this.upperThreshold && scroller.scrollHeight > scroller.offsetHeight) { // fetch history
+            var firstIndex = 0;
+            if (this._data) {
+              firstIndex = this._data[0].index;
+            }
+            var startIndex = Math.max(firstIndex - Math.abs(this.historyLimit), 0);
+            var limit = Math.min(Math.abs(this.historyLimit), firstIndex);
+            if (limit > 0) {
+              ajaxHistory.headers['startIndex'] = startIndex;
+              ajaxHistory.headers['limit'] = limit;
+//              console.log("fetching history with startIndex (" + ajaxHistory.headers['startIndex'] + ") and limit (" + ajaxHistory.headers['limit'] + ")");
+              ajaxHistory.generateRequest();
+            }
+          }
+          else { // fetch new messages
+            ajaxMessages.headers['startIndex'] = this._lastKnownIndex + 1;
+            ajaxMessages.headers['limit'] = 0;
+//            console.log("polling messages with startIndex (" + ajaxMessages.headers['startIndex'] + ") and limit (" + ajaxMessages.headers['limit'] + ")");
+            ajaxMessages.generateRequest();
+          }
+        }
+        if (repeat) {
+          setTimeout(this._pollMessages.bind(this, true), this.messagePollingInterval);
+        }
+      },
+
+      // Data processing
+
+      _receiveMessages: function(event) {
+        this._errorMsg = null;
+        // update data set
+        var messagesToAdd = event.target.lastResponse;
+        if (messagesToAdd && messagesToAdd.length) {
+          this._data = this._data.concat(messagesToAdd);
+          // force synchronous update
+          this.querySelector('#messagerepeat').render();
+          // scrolling
+          var messagescroll = this.querySelector('#messagescroll');
+          var scroller = messagescroll.scroller;
+          if (this._firstReceiveMessages || scroller.scrollHeight - scroller.scrollTop - scroller.offsetHeight < 100) { // scroll bar is near the end
+            this._firstReceiveMessages = false;
+            messagescroll.scroll(scroller.scrollHeight, true); // // true, works better with chromium
+          }
+          // update index
+          this._lastKnownIndex = messagesToAdd[messagesToAdd.length - 1].index;
+        }
+      },
+
+      _receiveHistory: function(event) {
+        this._errorMsg = null;
+        // update data set
+        var messagesToAdd = event.target.lastResponse;
+        if (messagesToAdd && messagesToAdd.length) {
+          var messagescroll = this.querySelector('#messagescroll');
+          var scroller = messagescroll.scroller;
+          var oldHeight = scroller.scrollHeight;
+          this._data = messagesToAdd.concat(this._data);
+          // force synchronous update
+          this.querySelector('#messagerepeat').render();
+          // scroll back to old position after update
+          messagescroll.scroll(scroller.scrollTop + scroller.scrollHeight - oldHeight, false);
+        }
+      },
+
+      // Error handling
+
+      _handleError: function(event) {
+        if (event.detail.request.xhr.readyState == 4 && event.detail.request.xhr.status == 0) { // network issues
+          this._errorMsg = 'Network Connection Error - Could not connect to: ' + event.detail.request.url;
+        }
+        else {
+//          console.log(event);
+          this._errorMsg = event.detail.error;
+          // read error messages array, if exists
+          var response = event.detail.request.xhr.response
+          if (response) {
+            this._errorMsg = this._errorMsg + " - " + response.join('<br />');
+          }
+        }
+      },
+
+    });
+  </script>
+
+</dom-module>
