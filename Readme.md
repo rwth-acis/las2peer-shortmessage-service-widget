@@ -63,11 +63,11 @@ Don't forget to include the import in the **<head>** tag of your website, like:
 
 Example 1: Simple chat window for *User A* to chat with *User B* (represented by agent id 123456789)
 
-    <las2peer-shortmessage-service-widget base-url="https://my-webconnector-endpoint.example.org" login-name="User A" login-password="userAPassword" recipient-id="123456789" ></las2peer-shortmessage-service-widget>
+    <las2peer-shortmessage-service-widget service-endpoint-url="https://my-webconnector-endpoint.example.org:9080/sms-service/1.0/" login-name="User A" login-password="userAPassword" recipient-id="123456789" ></las2peer-shortmessage-service-widget>
 
 Example 2: You can also assign the sender and recipient dynamically using Javascript. (like the demo)
 
-    <las2peer-shortmessage-service-widget id="smsWidget" base-url="https://my-webconnector-endpoint.example.org"></las2peer-shortmessage-service-widget>
+    <las2peer-shortmessage-service-widget id="smsWidget" service-endpoint-url="https://my-webconnector-endpoint.example.org:9080/sms-service/1.0/"></las2peer-shortmessage-service-widget>
     ...
     <script>
         var smsWidget = document.getElementById("smsWidget");

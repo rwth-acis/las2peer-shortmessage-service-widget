@@ -22,7 +22,7 @@ Allows chatting with a specific agent id.
 
 Example:
 
-    <las2peer-shortmessage-service-widget base-url='https://example.org/'></las2peer-shortmessage-service-widget>
+    <las2peer-shortmessage-service-widget service-endpoint-url="https://example.org/sms-service/1.0/"></las2peer-shortmessage-service-widget>
 
 @demo demo/index.html
 -->
@@ -33,7 +33,7 @@ Example:
 
     <iron-ajax id="ajaxSubmitMessage"
                 method = 'POST'
-                url = '[[_baseUrl]]/messages/[[recipientId]]'
+                url = '[[realServiceEndpointUrl]]/messages/[[recipientId]]'
                 handle-as = "text"
                 on-response = "_receiveSendMessage"
                 on-error = "_handleError"
@@ -89,7 +89,7 @@ Example:
 <!--      <paper-icon-button icon="more-vert"></paper-icon-button>-->
       </paper-toolbar>
 
-      <message-list base-url="[[_baseUrl]]" recipient-id="[[recipientId]]" initial-limit="[[initialMessageCount]]" history-limit="[[historyMessageCount]]" message-polling-interval="[[messagePollingInterval]]" request-headers="[[_requestHeaders]]"></message-list>
+      <message-list service-endpoint-url="[[realServiceEndpointUrl]]" recipient-id="[[recipientId]]" initial-limit="[[initialMessageCount]]" history-limit="[[historyMessageCount]]" message-polling-interval="[[messagePollingInterval]]" request-headers="[[_requestHeaders]]"></message-list>
 
       <form is="iron-form" id="msginputform" on-iron-form-presubmit="_submitMessage">
         <paper-input-container id="messageinputcontainer">
@@ -110,13 +110,13 @@ Example:
       is: 'las2peer-shortmessage-service-widget',
 
       properties: {
-        baseUrl: {
+        serviceEndpointUrl: {
           type: String,
           value: 'http://localhost:14580/'
         },
-        _baseUrl:  {
+        realServiceEndpointUrl:  {
           type: String,
-          computed: '_computeBaseURL(baseUrl)'
+          computed: '_computeServiceEndpointUrl(serviceEndpointUrl)'
         },
         loginName: {
           type: String,
@@ -181,11 +181,11 @@ Example:
         }
       },
 
-      _computeBaseURL: function(base) {
-        if (!base.endsWith('/')) {
-          base = base + '/';
+      _computeServiceEndpointUrl: function(url) {
+        if (url.endsWith('/')) {
+          url = url.slice(0, -1);
         }
-        return base + "sms-service";
+        return url;
       },
 
       _computeHeaders: function(loginName,loginPassword,loginOidcToken,loginOidcProvider) {
@@ -264,7 +264,7 @@ Example:
 
     <iron-ajax id="ajaxMessages"
                 method = 'GET'
-                url = '[[baseUrl]]/messages/[[recipientId]]'
+                url = '[[realServiceEndpointUrl]]/messages/[[recipientId]]'
                 handle-as = "json"
                 on-response = "_receiveMessages"
                 on-error = "_handleError"
@@ -275,7 +275,7 @@ Example:
 
     <iron-ajax id="ajaxHistory"
                 method = 'GET'
-                url = '[[baseUrl]]/messages/[[recipientId]]'
+                url = '[[realServiceEndpointUrl]]/messages/[[recipientId]]'
                 handle-as = "json"
                 on-response = "_receiveHistory"
                 on-error = "_handleError"
@@ -335,7 +335,11 @@ Example:
       is: 'message-list',
 
       properties: {
-        baseUrl: String,
+        serviceEndpointUrl: String,
+        realServiceEndpointUrl:  {
+          type: String,
+          computed: '_computeServiceEndpointUrl(serviceEndpointUrl)'
+        },
         recipientId: String,
         initialLimit: Number,
         historyLimit: Number,
@@ -381,6 +385,13 @@ Example:
           type: Boolean,
           value: true,
         },
+      },
+
+      _computeServiceEndpointUrl: function(url) {
+        if (url.endsWith('/')) {
+          url = url.slice(0, -1);
+        }
+        return url;
       },
 
       _isLoading: function(firstReceiveMessages, fetchingHistory) {
