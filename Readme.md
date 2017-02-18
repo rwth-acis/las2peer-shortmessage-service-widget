@@ -25,14 +25,14 @@ Install requirements:
 
 To use the widget in your project just install itself with:
 
-    bower install --save https://github.com/rwth-acis/las2peer-shortmessage-service-widget.git#v0.1.2
+    bower install --save https://github.com/rwth-acis/las2peer-shortmessage-service-widget.git#v0.2.0
 
 Alternatively you can add the entry manually to your **bower.json** file and call `bower install` afterwards.
 
     {
          "dependencies": {
              ...
-             "las2peer-shortmessage-service-widget": "git@github.com:rwth-acis/las2peer-shortmessage-service-widget.git#v0.1.2"
+             "las2peer-shortmessage-service-widget": "git@github.com:rwth-acis/las2peer-shortmessage-service-widget.git#v0.2.0"
              ...
          }
     }
